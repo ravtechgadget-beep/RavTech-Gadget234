@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "UserStats": {
+      "title": "UserStats",
+      "description": "User's progress and stats",
+      "type": "object",
+      "properties": {
+        "xp": { "type": "number" },
+        "level": { "type": "number" },
+        "coins": { "type": "number" },
+        "streak": { "type": "number" },
+        "lastActive": { "type": "number" },
+        "badges": { "type": "array", "items": { "type": "string" } },
+        "completedQuests": { "type": "array", "items": { "type": "string" } },
+        "totalLessonsCompleted": { "type": "number" },
+        "totalQuizzesPassed": { "type": "number" },
+        "skillTree": { "type": "object" },
+        "activeBoosts": { "type": "object" },
+        "completedLessons": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["xp", "level", "coins", "streak", "lastActive"]
+    },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Publicly visible user information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "xp": { "type": "number" },
+        "level": { "type": "number" },
+        "badgesCount": { "type": "number" },
+        "streak": { "type": "number" }
+      },
+      "required": ["userId", "name", "xp", "level", "badgesCount", "streak"]
+    },
+    "UserVaultMetadata": {
+      "title": "UserVaultMetadata",
+      "description": "User's private study vault metadata (excluding lessons)",
+      "type": "object",
+      "properties": {
+        "mnemonics": { "type": "object" },
+        "globalFlashcards": { "type": "array", "items": { "type": "object" } },
+        "examHistory": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "CachedLesson": {
+      "title": "CachedLesson",
+      "description": "Individual cached lesson content",
+      "type": "object",
+      "properties": {
+        "script": { "type": "string" },
+        "quiz": { "type": "array", "items": { "type": "object" } },
+        "flashcards": { "type": "array", "items": { "type": "object" } },
+        "pulse": { "type": "object" },
+        "masteryChoices": { "type": "array", "items": { "type": "object" } },
+        "audio": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "timestamp": { "type": "number" }
+      }
+    },
+    "CommunityPost": {
+      "title": "CommunityPost",
+      "description": "A post in the neural community feed",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhoto": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["achievement", "question", "status"] },
+        "likes": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "userName", "content", "type", "createdAt"]
+    },
+    "StudyGroup": {
+      "title": "StudyGroup",
+      "description": "A real-time collaborative study pool",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "activeUsers": { "type": "array", "items": { "type": "string" } },
+        "topic": { "type": "string" },
+        "timer": { "type": "number" },
+        "isPrivate": { "type": "boolean" }
+      },
+      "required": ["id", "name", "activeUsers"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserStats",
+      "description": "Private user statistics and progress"
+    },
+    "users/{userId}/vault/data": {
+      "schema": "UserVaultMetadata",
+      "description": "User's private study vault metadata"
+    },
+    "users/{userId}/vault/data/lessons/{lessonId}": {
+      "schema": "CachedLesson",
+      "description": "Individual cached lesson content"
+    },
+    "public_profiles/{userId}": {
+      "schema": "PublicProfile",
+      "description": "Public profile for leaderboard and social features"
+    },
+    "community_feed/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Public feed of community interactions"
+    },
+    "study_groups/{groupId}": {
+      "schema": "StudyGroup",
+      "description": "Real-time study rooms"
+    }
+  }
+}

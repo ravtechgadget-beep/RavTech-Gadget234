@@ -1,0 +1,168 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId}
+// Fields:
+//   - xp: number (required)
+//   - level: number (required)
+//   - coins: number (required)
+//   - streak: number (required)
+//   - lastActive: number (required)
+//   - badges: array of strings (optional)
+//   - completedQuests: array of strings (optional)
+//   - totalLessonsCompleted: number (optional)
+//   - totalQuizzesPassed: number (optional)
+//   - skillTree: map (optional)
+//   - activeBoosts: map (optional)
+//   - completedLessons: array of strings (optional)
+//
+// Collection: users/{userId}/vault
+// Document ID: data
+// Fields:
+//   - mnemonics: map (optional)
+//   - lessons: map (optional)
+//   - globalFlashcards: array of objects (optional)
+//   - examHistory: array of objects (optional)
+//
+// Collection: public_profiles
+// Document ID: {userId}
+// Fields:
+//   - userId: string (required, immutable)
+//   - name: string (required, max 50 chars)
+//   - xp: number (required)
+//   - level: number (required)
+//   - badgesCount: number (required)
+//   - streak: number (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "ravtechgadget@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUserStats(data) {
+      return data.xp is number && data.xp >= 0 &&
+             data.level is number && data.level >= 1 &&
+             data.coins is number && data.coins >= 0 &&
+             data.streak is number && data.streak >= 0 &&
+             data.lastActive is number;
+    }
+
+    function isValidPublicProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 50 &&
+             data.xp is number && data.xp >= 0 &&
+             data.level is number && data.level >= 1 &&
+             data.badgesCount is number && data.badgesCount >= 0 &&
+             data.streak is number && data.streak >= 0;
+    }
+
+    function isValidCommunityPost(data) {
+      return data.userId == request.auth.uid &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 1000 &&
+             data.type in ["achievement", "question", "status"] &&
+             data.createdAt is number;
+    }
+
+    function isValidStudyGroup(data) {
+      return data.id is string &&
+             data.name is string && data.name.size() > 0 &&
+             data.activeUsers is list;
+    }
+
+    // ===============================================================
+    // Match Blocks
+    // ===============================================================
+
+    // User Stats
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && hasRequiredFields(['xp', 'level', 'coins', 'streak', 'lastActive']) && isValidUserStats(request.resource.data);
+      allow update: if isOwner(userId) && isValidUserStats(request.resource.data);
+    }
+
+    // User Vault (Subcollection)
+    match /users/{userId}/vault/data {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId);
+    }
+
+    match /users/{userId}/vault/data/lessons/{lessonId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update, delete: if isOwner(userId);
+    }
+
+    // Public Profiles (for Leaderboard)
+    match /public_profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && hasRequiredFields(['userId', 'name', 'xp', 'level', 'badgesCount', 'streak']) && isValidPublicProfile(request.resource.data);
+      allow update: if isOwner(userId) && isValidPublicProfile(request.resource.data);
+    }
+
+    // Community Feed
+    match /community_feed/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidCommunityPost(request.resource.data);
+      allow update: if isAuthenticated() && (
+        isOwner(resource.data.userId) || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']))
+      );
+      allow delete: if isAuthenticated() && isOwner(resource.data.userId);
+    }
+
+    // Study Groups
+    match /study_groups/{groupId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidStudyGroup(request.resource.data);
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
